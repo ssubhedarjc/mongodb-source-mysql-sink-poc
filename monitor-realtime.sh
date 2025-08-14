@@ -19,7 +19,7 @@ get_mongodb_data() {
     use('cdc_poc');
     db.systemusers.find({}, {userId: 1, firstName: 1, lastName: 1, department: 1, role: 1, status: 1, _id: 0})
       .sort({userId: 1})
-      .limit(10)
+      .limit(20)
       .toArray()
       .forEach(doc => print(JSON.stringify(doc)));
     " 2>/dev/null | grep -v "^$" | grep -E '^{.*}$'
@@ -32,7 +32,7 @@ get_postgresql_data() {
            EXTRACT(EPOCH FROM \"createdAt\")::INTEGER as created_ts
     FROM systemusers 
     ORDER BY user_id 
-    LIMIT 10;
+    LIMIT 20;
     " 2>/dev/null | grep -v "^$" | while read line; do
         echo "$line" | sed 's/|/,/g' | sed 's/^ *//g' | sed 's/ *$//g'
     done
@@ -76,7 +76,7 @@ display_comparison() {
     fi
     
     echo ""
-    echo -e "${MAGENTA}📋 Recent Data (Top 10 users):${NC}"
+    echo -e "${MAGENTA}📋 All Users (Max 20 for easy tracking):${NC}"
     
     # Headers
     printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" "User ID" "First Name" "Last Name" "Department" "Role" "Status"
@@ -84,7 +84,7 @@ display_comparison() {
     
     # Get and display MongoDB data
     echo -e "${YELLOW}MongoDB:${NC}"
-    get_mongodb_data | head -10 | while IFS= read -r line; do
+    get_mongodb_data | while IFS= read -r line; do
         if [ -n "$line" ]; then
             # Parse JSON and format
             user_id=$(echo "$line" | grep -o '"userId":"[^"]*"' | cut -d'"' -f4)
@@ -102,7 +102,7 @@ display_comparison() {
     
     echo ""
     echo -e "${BLUE}PostgreSQL:${NC}"
-    get_postgresql_data | head -10 | while IFS=',' read -r user_id first_name last_name department role status created_ts; do
+    get_postgresql_data | while IFS=',' read -r user_id first_name last_name department role status created_ts; do
         if [ -n "$user_id" ]; then
             printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" \
                 "${user_id// /}" "${first_name// /}" "${last_name// /}" \

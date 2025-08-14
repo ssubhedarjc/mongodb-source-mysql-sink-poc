@@ -7,6 +7,7 @@ const COLLECTION_NAME = 'systemusers';
 const MIN_INTERVAL = 10000; // 10 seconds minimum
 const MAX_INTERVAL = 30000; // 30 seconds maximum
 const MIN_USERS = 5; // Minimum users to maintain
+const MAX_USERS = 20; // Maximum users to maintain
 
 // Sample data
 const FIRST_NAMES = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Ivy', 'Jack', 'Kate', 'Liam', 'Mia', 'Noah', 'Olivia', 'Paul', 'Quinn', 'Ruby', 'Sam', 'Tina'];
@@ -51,9 +52,16 @@ function generateUser() {
 // CRUD Operations
 async function performInsert() {
     try {
+        // Check if we've reached the maximum user limit
+        const totalUsers = await collection.countDocuments();
+        if (totalUsers >= MAX_USERS) {
+            console.log(`⚠️  [${new Date().toISOString()}] INSERT: Maximum ${MAX_USERS} users reached, skipping insert`);
+            return;
+        }
+
         const user = generateUser();
         const result = await collection.insertOne(user);
-        console.log(`✅ [${new Date().toISOString()}] INSERT: Created user ${user.userId}`);
+        console.log(`✅ [${new Date().toISOString()}] INSERT: Created user ${user.userId} (Total: ${totalUsers + 1}/${MAX_USERS})`);
         return result;
     } catch (error) {
         console.error(`❌ [${new Date().toISOString()}] INSERT failed:`, error.message);
@@ -62,7 +70,7 @@ async function performInsert() {
 
 async function performUpdate() {
     try {
-        const users = await collection.find({}, { projection: { userId: 1 } }).limit(20).toArray();
+        const users = await collection.find({}, { projection: { userId: 1 } }).toArray();
         if (users.length === 0) {
             console.log(`⚠️  [${new Date().toISOString()}] UPDATE: No users found to update`);
             return;
@@ -93,7 +101,7 @@ async function performUpdate() {
 
 async function performSoftDelete() {
     try {
-        const users = await collection.find({ status: 'active' }, { projection: { userId: 1 } }).limit(10).toArray();
+        const users = await collection.find({ status: 'active' }, { projection: { userId: 1 } }).toArray();
         if (users.length === 0) {
             console.log(`⚠️  [${new Date().toISOString()}] SOFT DELETE: No active users found to deactivate`);
             return;
@@ -117,11 +125,11 @@ async function performHardDelete() {
     try {
         const totalUsers = await collection.countDocuments();
         if (totalUsers <= MIN_USERS) {
-            console.log(`⚠️  [${new Date().toISOString()}] HARD DELETE: Maintaining minimum ${MIN_USERS} users, skipping delete`);
+            console.log(`⚠️  [${new Date().toISOString()}] HARD DELETE: Maintaining minimum ${MIN_USERS} users, skipping delete (Current: ${totalUsers})`);
             return;
         }
 
-        const users = await collection.find({}, { projection: { userId: 1 } }).limit(10).toArray();
+        const users = await collection.find({}, { projection: { userId: 1 } }).toArray();
         if (users.length === 0) {
             console.log(`⚠️  [${new Date().toISOString()}] HARD DELETE: No users found to delete`);
             return;
@@ -131,7 +139,7 @@ async function performHardDelete() {
         const result = await collection.deleteOne({ userId: userToDelete.userId });
 
         if (result.deletedCount > 0) {
-            console.log(`✅ [${new Date().toISOString()}] HARD DELETE: Deleted user ${userToDelete.userId}`);
+            console.log(`✅ [${new Date().toISOString()}] HARD DELETE: Deleted user ${userToDelete.userId} (Remaining: ${totalUsers - 1}/${MAX_USERS})`);
         }
     } catch (error) {
         console.error(`❌ [${new Date().toISOString()}] HARD DELETE failed:`, error.message);
@@ -150,22 +158,43 @@ async function showStats() {
     }
 }
 
-// Operation selector with weights
+// Operation selector with weights - adjusted for limited user pool
 async function performRandomOperation() {
+    const totalUsers = await collection.countDocuments();
     const rand = Math.random() * 100;
     
-    if (rand < 50) {
-        // 50% chance - INSERT
+    // Adjust operation probabilities based on current user count
+    if (totalUsers < MIN_USERS) {
+        // Force INSERT when below minimum
+        console.log(`🔄 [${new Date().toISOString()}] Below minimum users (${totalUsers}/${MIN_USERS}), forcing INSERT`);
         await performInsert();
-    } else if (rand < 75) {
-        // 25% chance - UPDATE
-        await performUpdate();
-    } else if (rand < 90) {
-        // 15% chance - SOFT DELETE
-        await performSoftDelete();
+    } else if (totalUsers >= MAX_USERS) {
+        // No INSERTs when at maximum, only UPDATE/DELETE
+        if (rand < 60) {
+            // 60% chance - UPDATE
+            await performUpdate();
+        } else if (rand < 85) {
+            // 25% chance - SOFT DELETE
+            await performSoftDelete();
+        } else {
+            // 15% chance - HARD DELETE
+            await performHardDelete();
+        }
     } else {
-        // 10% chance - HARD DELETE
-        await performHardDelete();
+        // Normal operation when between MIN and MAX
+        if (rand < 40) {
+            // 40% chance - INSERT
+            await performInsert();
+        } else if (rand < 70) {
+            // 30% chance - UPDATE
+            await performUpdate();
+        } else if (rand < 85) {
+            // 15% chance - SOFT DELETE
+            await performSoftDelete();
+        } else {
+            // 15% chance - HARD DELETE
+            await performHardDelete();
+        }
     }
 }
 
@@ -174,7 +203,10 @@ async function runContinuousOperations() {
     let operationCount = 0;
     
     console.log(`🚀 [${new Date().toISOString()}] Starting continuous CRUD operations...`);
-    console.log(`📋 Configuration: ${MIN_INTERVAL/1000}s - ${MAX_INTERVAL/1000}s intervals, min ${MIN_USERS} users`);
+    console.log(`📋 Configuration: ${MIN_INTERVAL/1000}s - ${MAX_INTERVAL/1000}s intervals, ${MIN_USERS}-${MAX_USERS} users`);
+    
+    // Show initial stats
+    await showStats();
     
     while (true) {
         try {
