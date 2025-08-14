@@ -1,7 +1,7 @@
 const { MongoClient } = require('mongodb');
 
 // Configuration
-const MONGODB_URI = 'mongodb://mongodb:27017';
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017';
 const DATABASE_NAME = 'cdc_poc';
 const COLLECTION_NAME = 'systemusers';
 const MIN_INTERVAL = 10000; // 10 seconds minimum

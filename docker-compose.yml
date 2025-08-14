@@ -138,7 +138,8 @@ services:
     depends_on:
       - mongodb
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
+      - MONGODB_URI=mongodb://mongodb:27017
     restart: unless-stopped
 
 volumes:
