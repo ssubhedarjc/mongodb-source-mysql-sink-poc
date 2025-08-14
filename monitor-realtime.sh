@@ -16,20 +16,20 @@ echo ""
 # Function to get MongoDB data with timestamps
 get_mongodb_data() {
     docker exec mongodb mongosh --host localhost:27017 --quiet --eval "
-    use testdb;
-    db.systemusers.find({}, {userId: 1, firstName: 1, lastName: 1, department: 1, role: 1, isActive: 1, _id: 0})
+    use('cdc_poc');
+    db.systemusers.find({}, {userId: 1, firstName: 1, lastName: 1, department: 1, role: 1, status: 1, _id: 0})
       .sort({userId: 1})
       .limit(10)
       .toArray()
       .forEach(doc => print(JSON.stringify(doc)));
-    " 2>/dev/null | grep -v "^$"
+    " 2>/dev/null | grep -v "^$" | grep -E '^{.*}$'
 }
 
 # Function to get PostgreSQL data with timestamps
 get_postgresql_data() {
     docker exec postgres psql -U postgres -d testdb -t -c "
-    SELECT user_id, first_name, last_name, department, role, is_active, 
-           EXTRACT(EPOCH FROM kafka_timestamp)::INTEGER as kafka_ts
+    SELECT user_id, first_name, last_name, department, role, status, 
+           EXTRACT(EPOCH FROM \"createdAt\")::INTEGER as created_ts
     FROM systemusers 
     ORDER BY user_id 
     LIMIT 10;
@@ -42,7 +42,7 @@ get_postgresql_data() {
 get_kafka_lag() {
     local topic_info=$(docker exec kafka kafka-run-class kafka.tools.GetOffsetShell \
         --broker-list localhost:9092 \
-        --topic mongodb.testdb.systemusers \
+        --topic mongodb.cdc_poc.systemusers \
         --time -1 2>/dev/null | head -1)
     
     if [ -n "$topic_info" ]; then
@@ -60,8 +60,8 @@ display_comparison() {
     echo ""
     
     # Get counts
-    local mongo_count=$(docker exec mongodb mongosh --host localhost:27017 --quiet --eval "use testdb; db.systemusers.countDocuments();" 2>/dev/null)
-    local pg_count=$(docker exec postgres psql -U postgres -d testdb -t -c "SELECT COUNT(*) FROM systemusers;" 2>/dev/null | tr -d ' ')
+    local mongo_count=$(docker exec mongodb mongosh --host localhost:27017 --quiet --eval "use('cdc_poc'); db.systemusers.countDocuments();" 2>/dev/null | tail -1 | grep -E '^[0-9]+$')
+    local pg_count=$(docker exec postgres psql -U postgres -d testdb -t -c "SELECT COUNT(*) FROM systemusers;" 2>/dev/null | tr -d ' ' | grep -E '^[0-9]+$')
     local kafka_offset=$(get_kafka_lag)
     
     echo -e "${CYAN}📊 Statistics:${NC}"
@@ -79,8 +79,8 @@ display_comparison() {
     echo -e "${MAGENTA}📋 Recent Data (Top 10 users):${NC}"
     
     # Headers
-    printf "%-12s %-15s %-15s %-12s %-15s %-8s\n" "User ID" "First Name" "Last Name" "Department" "Role" "Active"
-    printf "%-12s %-15s %-15s %-12s %-15s %-8s\n" "--------" "-----------" "-----------" "----------" "----" "------"
+    printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" "User ID" "First Name" "Last Name" "Department" "Role" "Status"
+    printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" "---------------" "----------" "----------" "----------" "----" "------"
     
     # Get and display MongoDB data
     echo -e "${YELLOW}MongoDB:${NC}"
@@ -92,21 +92,21 @@ display_comparison() {
             last_name=$(echo "$line" | grep -o '"lastName":"[^"]*"' | cut -d'"' -f4)
             department=$(echo "$line" | grep -o '"department":"[^"]*"' | cut -d'"' -f4)
             role=$(echo "$line" | grep -o '"role":"[^"]*"' | cut -d'"' -f4)
-            is_active=$(echo "$line" | grep -o '"isActive":[^,}]*' | cut -d':' -f2)
+            status=$(echo "$line" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
             
-            printf "%-12s %-15s %-15s %-12s %-15s %-8s\n" \
+            printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" \
                 "${user_id:-N/A}" "${first_name:-N/A}" "${last_name:-N/A}" \
-                "${department:-N/A}" "${role:-N/A}" "${is_active:-N/A}"
+                "${department:-N/A}" "${role:-N/A}" "${status:-N/A}"
         fi
     done
     
     echo ""
     echo -e "${BLUE}PostgreSQL:${NC}"
-    get_postgresql_data | head -10 | while IFS=',' read -r user_id first_name last_name department role is_active kafka_ts; do
+    get_postgresql_data | head -10 | while IFS=',' read -r user_id first_name last_name department role status created_ts; do
         if [ -n "$user_id" ]; then
-            printf "%-12s %-15s %-15s %-12s %-15s %-8s\n" \
+            printf "%-15s %-12s %-12s %-12s %-12s %-8s\n" \
                 "${user_id// /}" "${first_name// /}" "${last_name// /}" \
-                "${department// /}" "${role// /}" "${is_active// /}"
+                "${department// /}" "${role// /}" "${status// /}"
         fi
     done
 }
