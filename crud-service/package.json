@@ -1,0 +1,12 @@
+{
+  "name": "crud-operations-service",
+  "version": "1.0.0",
+  "description": "Continuous CRUD operations for CDC testing",
+  "main": "crud-operations.js",
+  "dependencies": {
+    "mongodb": "^6.0.0"
+  },
+  "scripts": {
+    "start": "node crud-operations.js"
+  }
+}

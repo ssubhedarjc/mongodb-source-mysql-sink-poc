@@ -1,0 +1,38 @@
+# Logs
+*.log
+logs/
+
+# Docker volumes
+.volumes/
+
+# Environment files (if containing sensitive data)
+# .env
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+
+# Backup files
+*.bak
+*.backup
+
+# Database files (if running locally)
+*.db
+*.sqlite
+
+# Node modules (if adding any Node.js tooling)
+node_modules/
+
+# Python cache (if adding any Python tooling)
+__pycache__/
+*.pyc

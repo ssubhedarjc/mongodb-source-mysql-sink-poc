@@ -1,0 +1,23 @@
+{
+  "name": "mongodb-source-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.mongodb.MongoDbConnector",
+    "tasks.max": "1",
+    "mongodb.connection.string": "mongodb://mongodb:27017/?replicaSet=rs0",
+    "mongodb.name": "mongodb-server",
+    "database.include.list": "cdc_poc",
+    "collection.include.list": "cdc_poc.systemusers",
+    "topic.prefix": "mongodb",
+    "snapshot.mode": "initial",
+    "schema.name.adjustment.mode": "avro",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.connector.mongodb.transforms.ExtractNewDocumentState",
+    "transforms.unwrap.drop.tombstones": "true",
+    "transforms.unwrap.delete.handling.mode": "drop",
+    "transforms.unwrap.operation.header": "true",
+    "key.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "key.converter.schemas.enable": "true",
+    "value.converter.schemas.enable": "true"
+  }
+}
